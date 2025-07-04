@@ -1,0 +1,104 @@
+
+!pip install optuna openpyxl lightgbm scikit-learn matplotlib seaborn
+
+# 📌 2. import
+import pandas as pd
+import lightgbm as lgb
+import optuna
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+from google.colab import files
+import numpy as np
+
+# 📌 3. Upload training file
+print("⬆️ Please upload the training file (train.xlsx):")
+uploaded_train = files.upload()
+train_path = list(uploaded_train.keys())[0]
+df_train = pd.read_excel(train_path)
+
+# 📌 4. Data preparation
+X = df_train.drop(columns=["Result"])
+y = df_train["Result"]
+
+# 📌 5. Training/Accreditation Division
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 📌 6. Optuna objective
+def objective(trial):
+    param = {
+        'objective': 'multiclass',
+        'metric': 'multi_logloss',
+        'num_class': len(np.unique(y)),
+        'verbosity': -1,
+        'boosting_type': 'gbdt',
+        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+        'num_leaves': trial.suggest_int('num_leaves', 15, 200),
+        'feature_fraction': trial.suggest_float('feature_fraction', 0.6, 1.0),
+        'bagging_fraction': trial.suggest_float('bagging_fraction', 0.6, 1.0),
+        'bagging_freq': trial.suggest_int('bagging_freq', 1, 7),
+        'min_child_samples': trial.suggest_int('min_child_samples', 5, 100)
+    }
+
+    dtrain = lgb.Dataset(X_train, label=y_train)
+    dvalid = lgb.Dataset(X_valid, label=y_valid)
+    model = lgb.train(param, dtrain, valid_sets=[dvalid], early_stopping_rounds=20, verbose_eval=False)
+    preds = model.predict(X_valid)
+    pred_labels = [np.argmax(p) for p in preds]
+    return accuracy_score(y_valid, pred_labels)
+
+# 📌 7.  Optuna
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=50)
+
+# 📌 8. Teaching the final model
+best_params = study.best_params
+best_params.update({
+    'objective': 'multiclass',
+    'metric': 'multi_logloss',
+    'num_class': len(np.unique(y))
+})
+final_train = lgb.Dataset(X, label=y)
+model = lgb.train(best_params, final_train, num_boost_round=100)
+
+# 📌 9. Prediction on validation data for reporting
+valid_preds = model.predict(X_valid)
+valid_pred_labels = [np.argmax(p) for p in valid_preds]
+
+# 🎯 10. Display accuracy and classification report
+print("✅ Accuracy:", accuracy_score(y_valid, valid_pred_labels))
+print("\n📄 Classification Report:")
+print(classification_report(y_valid, valid_pred_labels))
+
+# 🔷 11. Confusion Matrix
+cm = confusion_matrix(y_valid, valid_pred_labels)
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=np.unique(y), yticklabels=np.unique(y))
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show()
+
+# 🔶 12.The importance of features
+lgb.plot_importance(model, max_num_features=20, importance_type='gain', figsize=(10, 6))
+plt.title("Feature Importance")
+plt.show()
+
+# 📥 13. Upload test file
+print("⬆️ لطفا فایل تست (test.xlsx) را آپلود کنید:")
+uploaded_test = files.upload()
+test_path = list(uploaded_test.keys())[0]
+df_test = pd.read_excel(test_path)
+
+# 📤 14. Prediction on test and output
+test_preds = model.predict(df_test)
+test_pred_labels = [np.argmax(p) for p in test_preds]
+df_test["Result"] = test_pred_labels
+
+output_path = "predicted_result.xlsx"
+df_test.to_excel(output_path, index=False)
+
+# 📦 15.Download the output file
+files.download(output_path)
