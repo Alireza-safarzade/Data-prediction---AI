@@ -19,4 +19,4 @@ Algorithm (( LightGBM + Optuna )) Result :
 Algorithm (( LightGBM +  XGBoost  + Random Forest )) Result :
 
 
-![Screenshot 111](https://github.com/user-attachments/assets/0cd08383-f905-4b0d-b2c7-859a7b543599)
+![123](https://github.com/user-attachments/assets/f215dd4a-53b8-48df-ac98-c60dcf360e9a)
