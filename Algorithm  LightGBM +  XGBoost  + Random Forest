@@ -1,17 +1,18 @@
-# 📌 1. نصب کتابخانه‌های مورد نیاز
-!pip install lightgbm xgboost openpyxl scikit-learn optuna matplotlib seaborn --quiet
+# 📌 1. نصب کتابخانه‌ها
+!pip install lightgbm xgboost openpyxl scikit-learn matplotlib seaborn --quiet
 
 # 📌 2. importها
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
-from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay
 from google.colab import files
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -23,59 +24,58 @@ df_train = pd.read_excel(train_path)
 
 # 📌 4. آماده‌سازی داده
 if 'Profit' in df_train.columns:
-    df_train = df_train.drop(columns=['Profit'])
+    df_train.drop(columns=['Profit'], inplace=True)
 
-X = df_train.drop(columns=["Result"])
-y = df_train["Result"]
+X = df_train.drop(columns=['Result'])
+y = df_train['Result']
 feature_columns = X.columns.tolist()
 
-# 📌 5. تقسیم داده‌ها
+# 📌 5. تقسیم آموزش / اعتبارسنجی
 X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # 📌 6. تعریف مدل‌ها
-models = {
-    "LightGBM": LGBMClassifier(random_state=42),
-    "XGBoost": XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='mlogloss'),
-    "RandomForest": RandomForestClassifier(random_state=42)
-}
+model_lgb = LGBMClassifier(random_state=42)
+model_xgb = XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='mlogloss')
+model_rf = RandomForestClassifier(random_state=42)
 
-# 📌 7. آموزش و ارزیابی مدل‌ها
-f1_scores = {}
-for name, model in models.items():
-    model.fit(X_train, y_train)
-    preds = model.predict(X_valid)
-    f1 = f1_score(y_valid, preds, average="weighted")
-    f1_scores[name] = f1
-    print(f"🔍 {name} F1-Score: {f1:.4f}")
-    print(classification_report(y_valid, preds))
-    print("-" * 40)
+# 📌 7. ترکیب مدل‌ها با Voting
+ensemble_model = VotingClassifier(
+    estimators=[
+        ('lgb', model_lgb),
+        ('xgb', model_xgb),
+        ('rf', model_rf)
+    ],
+    voting='hard'  # یا 'soft' برای میانگین احتمالات
+)
 
-# 📌 8. انتخاب بهترین مدل
-best_model_name = max(f1_scores, key=f1_scores.get)
-best_model = models[best_model_name]
-print(f"✅ بهترین مدل انتخاب‌شده: {best_model_name}")
+# 📌 8. آموزش مدل ترکیبی
+ensemble_model.fit(X_train, y_train)
 
-# 📌 9. رسم Confusion Matrix مدل نهایی
-from sklearn.metrics import ConfusionMatrixDisplay
-ConfusionMatrixDisplay.from_estimator(best_model, X_valid, y_valid, display_labels=np.unique(y), cmap='Blues')
-plt.title("Confusion Matrix")
+# 📌 9. ارزیابی مدل ترکیبی
+valid_preds = ensemble_model.predict(X_valid)
+print("✅ گزارش طبقه‌بندی مدل ترکیبی:")
+print(classification_report(y_valid, valid_preds))
+
+# 📌 10. ماتریس سردرگمی
+ConfusionMatrixDisplay.from_estimator(ensemble_model, X_valid, y_valid, display_labels=np.unique(y), cmap='Blues')
+plt.title("Confusion Matrix - Voting Ensemble")
 plt.grid(False)
 plt.show()
 
-# 📌 10. آپلود فایل تست
+# 📌 11. دریافت فایل تست
 print("⬆️ لطفاً فایل تست (test.xlsx) را آپلود کنید:")
 uploaded_test = files.upload()
 test_path = list(uploaded_test.keys())[0]
 df_test = pd.read_excel(test_path)
 
-# 📌 11. پیش‌بینی روی فایل تست
+# 📌 12. پیش‌بینی روی فایل تست
 df_test_input = df_test[feature_columns]
-test_preds = best_model.predict(df_test_input)
-df_test["Result"] = test_preds
+test_preds = ensemble_model.predict(df_test_input)
+df_test['Result'] = test_preds
 
-# 📌 12. ذخیره فایل خروجی
-output_path = "predicted_result.xlsx"
+# 📌 13. ذخیره خروجی
+output_path = "predicted_result_ensemble.xlsx"
 df_test.to_excel(output_path, index=False)
 
-# 📌 13. دانلود فایل خروجی
+# 📌 14. دانلود فایل نهایی
 files.download(output_path)
