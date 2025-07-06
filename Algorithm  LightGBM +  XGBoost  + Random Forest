@@ -1,6 +1,6 @@
 # 📌 1. نصب کتابخانه‌ها
 !pip install lightgbm xgboost openpyxl scikit-learn matplotlib seaborn --quiet
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 2. importها
 import pandas as pd
 import numpy as np
@@ -15,13 +15,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings("ignore")
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 3. دریافت فایل آموزش
 print("⬆️ لطفاً فایل آموزش (train.xlsx) را آپلود کنید:")
 uploaded_train = files.upload()
 train_path = list(uploaded_train.keys())[0]
 df_train = pd.read_excel(train_path)
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 4. آماده‌سازی داده
 if 'Profit' in df_train.columns:
     df_train.drop(columns=['Profit'], inplace=True)
@@ -29,15 +29,15 @@ if 'Profit' in df_train.columns:
 X = df_train.drop(columns=['Result'])
 y = df_train['Result']
 feature_columns = X.columns.tolist()
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 5. تقسیم آموزش / اعتبارسنجی
 X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=42)
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 6. تعریف مدل‌ها
 model_lgb = LGBMClassifier(random_state=42)
 model_xgb = XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='mlogloss')
 model_rf = RandomForestClassifier(random_state=42)
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 7. ترکیب مدل‌ها با Voting
 ensemble_model = VotingClassifier(
     estimators=[
@@ -47,35 +47,36 @@ ensemble_model = VotingClassifier(
     ],
     voting='hard'  # یا 'soft' برای میانگین احتمالات
 )
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 8. آموزش مدل ترکیبی
 ensemble_model.fit(X_train, y_train)
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 9. ارزیابی مدل ترکیبی
 valid_preds = ensemble_model.predict(X_valid)
 print("✅ گزارش طبقه‌بندی مدل ترکیبی:")
 print(classification_report(y_valid, valid_preds))
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 10. ماتریس سردرگمی
 ConfusionMatrixDisplay.from_estimator(ensemble_model, X_valid, y_valid, display_labels=np.unique(y), cmap='Blues')
 plt.title("Confusion Matrix - Voting Ensemble")
 plt.grid(False)
 plt.show()
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 11. دریافت فایل تست
 print("⬆️ لطفاً فایل تست (test.xlsx) را آپلود کنید:")
 uploaded_test = files.upload()
 test_path = list(uploaded_test.keys())[0]
 df_test = pd.read_excel(test_path)
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 12. پیش‌بینی روی فایل تست
 df_test_input = df_test[feature_columns]
 test_preds = ensemble_model.predict(df_test_input)
 df_test['Result'] = test_preds
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 13. ذخیره خروجی
 output_path = "predicted_result_ensemble.xlsx"
 df_test.to_excel(output_path, index=False)
-
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # 📌 14. دانلود فایل نهایی
 files.download(output_path)
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
