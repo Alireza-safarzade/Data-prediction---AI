@@ -1,5 +1,7 @@
 # Data-prediction---AI
-Financial Big Data Forecasting with Artificial Intelligence
+This project works on data extracted from a personal strategy on several currency pairs in the Forex market. 
+The data was extracted from MetaTrader 4 and automatically imported into Excel. 
+The strategy has a win rate of approximately 40% and a r:r is 1:4. The goal of this project is to implement various artificial intelligence algorithms to #predict and increase the win rate.
 
 
 
