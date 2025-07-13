@@ -1,0 +1,111 @@
+# 📌 1. نصب کتابخانه‌ها
+!pip install xgboost openpyxl optuna scikit-learn matplotlib seaborn
+
+# 📌 2. importها
+import pandas as pd
+import numpy as np
+import xgboost as xgb
+import optuna
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+from google.colab import files
+
+# 📌 3. آپلود فایل آموزش
+print("⬆️ لطفاً فایل آموزش (train.xlsx) را آپلود کنید:")
+uploaded_train = files.upload()
+train_path = list(uploaded_train.keys())[0]
+df_train = pd.read_excel(train_path)
+
+# 📌 4. آماده‌سازی داده
+X = df_train.drop(columns=["Result", "Profit"], errors="ignore")  # حذف Profit فقط اگر وجود داشته باشه
+y = df_train["Result"]
+
+# ذخیره نام ویژگی‌ها برای استفاده در تست
+feature_columns = X.columns.tolist()
+
+# 📌 5. تقسیم آموزش/اعتبارسنجی
+X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 📌 6. تعریف objective برای Optuna
+def objective(trial):
+    param = {
+        'objective': 'multi:softprob',
+        'num_class': len(np.unique(y)),
+        'eval_metric': 'mlogloss',
+        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        'gamma': trial.suggest_float('gamma', 0, 5),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+        'verbosity': 0,
+        'tree_method': 'auto'
+    }
+
+    dtrain = xgb.DMatrix(X_train, label=y_train)
+    dvalid = xgb.DMatrix(X_valid, label=y_valid)
+    model = xgb.train(param, dtrain, num_boost_round=300, evals=[(dvalid, "eval")], early_stopping_rounds=20, verbose_eval=False)
+    preds = model.predict(dvalid)
+    pred_labels = np.argmax(preds, axis=1)
+    return accuracy_score(y_valid, pred_labels)
+
+# 📌 7. اجرای Optuna برای XGBoost
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=50)
+
+# 📌 8. آموزش نهایی مدل با بهترین پارامترها
+best_params = study.best_params
+best_params.update({
+    'objective': 'multi:softprob',
+    'num_class': len(np.unique(y)),
+    'eval_metric': 'mlogloss',
+    'verbosity': 0,
+    'tree_method': 'auto'
+})
+dtrain_full = xgb.DMatrix(X, label=y)
+final_model = xgb.train(best_params, dtrain_full, num_boost_round=300)
+
+# 📌 9. ارزیابی روی validation set
+dvalid = xgb.DMatrix(X_valid)
+valid_preds = final_model.predict(dvalid)
+valid_pred_labels = np.argmax(valid_preds, axis=1)
+
+print("✅ Accuracy:", accuracy_score(y_valid, valid_pred_labels))
+print("\n📄 Classification Report:")
+print(classification_report(y_valid, valid_pred_labels))
+
+# 📌 10. ماتریس سردرگمی
+cm = confusion_matrix(y_valid, valid_pred_labels)
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=np.unique(y), yticklabels=np.unique(y))
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix")
+plt.show()
+
+# 📌 11. اهمیت ویژگی‌ها
+xgb.plot_importance(final_model, max_num_features=20, importance_type='gain', height=0.5)
+plt.title("Feature Importance (Gain)")
+plt.show()
+
+# 📌 12. آپلود فایل تست
+print("⬆️ لطفاً فایل تست (test.xlsx) را آپلود کنید:")
+uploaded_test = files.upload()
+test_path = list(uploaded_test.keys())[0]
+df_test = pd.read_excel(test_path)
+
+# 📌 13. پیش‌بینی روی تست
+df_test_for_pred = df_test[feature_columns]
+dtest = xgb.DMatrix(df_test_for_pred)
+test_preds = final_model.predict(dtest)
+test_pred_labels = np.argmax(test_preds, axis=1)
+df_test["Result"] = test_pred_labels
+
+# 📌 14. خروجی فایل پیش‌بینی‌شده
+output_path = "xgb_predicted_result.xlsx"
+df_test.to_excel(output_path, index=False)
+
+# 📦 15. دانلود فایل
+files.download(output_path)
