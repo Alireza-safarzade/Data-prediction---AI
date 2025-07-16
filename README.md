@@ -20,3 +20,13 @@ Algorithm (( LightGBM +  XGBoost  + Random Forest )) Result :
 
 
 ![123](https://github.com/user-attachments/assets/f215dd4a-53b8-48df-ac98-c60dcf360e9a)
+
+
+
+
+
+Algorithm XGBoost With Optuna Result :
+
+
+
+<img width="268" height="584" alt="xgb" src="https://github.com/user-attachments/assets/20707271-08e6-4dfa-b131-892f37450dd5" />
