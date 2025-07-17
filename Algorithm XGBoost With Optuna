@@ -1,7 +1,7 @@
-# 📌 1. نصب کتابخانه‌ها
+# 📌 1. install Lab
 !pip install xgboost openpyxl optuna scikit-learn matplotlib seaborn
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 2. importها
+# 📌 2. import
 import pandas as pd
 import numpy as np
 import xgboost as xgb
@@ -12,43 +12,43 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from google.colab import files
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 3. آپلود و آماده‌سازی فایل آموزش
-print("✅ لطفاً فایل آموزش (شامل ستون Result و بدون Profit در تست) را آپلود کنید")
+# 📌 3. Upload training file
+print("⬆️ Please upload the training file (train.xlsx):")
 uploaded = files.upload()
 file_path = next(iter(uploaded))
 train_df = pd.read_excel(file_path)
 
-# حذف ستون‌های غیرعددی مثل Time
+# Remove non-numeric columns like time
 train_df = train_df.select_dtypes(include=[np.number])
 
-# جداسازی ویژگی‌ها و هدف
+# Separation of features and purpose
 X = train_df.drop(columns=["Result"], errors='ignore')
 y = train_df["Result"]
 
-# نگاشت کلاس‌ها برای XGBoost (به 0 و 1 و 2)
+# Class mapping for XGBoost (to 0, 1, and 2)
 label_map = {-1: 0, 0: 1, 1: 2}
 y = y.map(label_map)
 
-# تقسیم داده‌ها
+# Data sharing
 X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=42)
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 4. پیش‌پردازش: حذف ستون‌های اضافی و آماده‌سازی داده‌ها
-# حذف ستون‌هایی که مدل نمی‌تونه باهاشون کار کنه
+# 📌 4. Preprocessing: Removing extra columns and preparing data
+#        Remove columns that the model cannot work with.
 if 'Time' in train_df.columns:
     train_df = train_df.drop(columns=['Time'])
 
-# جدا کردن هدف و ویژگی‌ها
+# Separating purpose and features
 y = train_df["Result"]
 X = train_df.drop(columns=["Result", "Profit"], errors='ignore')
 
-# نگاشت کلاس‌ها به اعداد قابل فهم برای XGBoost
+# Mapping classes to understandable numbers for XGBoost
 label_map = {-1: 0, 0: 1, 1: 2}
 y_mapped = y.map(label_map)
 
-# تقسیم داده‌ها برای آموزش و اعتبارسنجی
+# Splitting data for training and validation
 X_train, X_valid, y_train, y_valid = train_test_split(X, y_mapped, test_size=0.2, random_state=42)
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 5. تعریف تابع Optuna برای XGBoost
+# 📌 5. Optuna function definition for XGBoost
 def objective(trial):
     params = {
         "objective": "multi:softprob",
@@ -82,11 +82,11 @@ def objective(trial):
     acc = accuracy_score(y_valid, pred_labels)
     return acc
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 6. اجرای Optuna
+# 📌 6. Run Optuna
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=50)
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 7. آموزش مدل نهایی با بهترین پارامترها
+# 📌 7. Training the final model with the best parameters
 best_params = study.best_params
 best_params.update({
     "objective": "multi:softprob",
@@ -98,28 +98,27 @@ best_params.update({
 dtrain_final = xgb.DMatrix(X, label=y_mapped)
 final_model = xgb.train(best_params, dtrain_final, num_boost_round=study.best_trial.number)
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 8. آپلود فایل تست از کاربر
+# 📌 8. Upload test file via user
 uploaded_test = files.upload()
 
-# فرض: فایل تست مثلاً اسمش هست test.xlsx
 df_test = pd.read_excel(next(iter(uploaded_test)))
 if 'Time' in df_test.columns:
     df_test = df_test.drop(columns=['Time'])
 
 X_test = df_test.copy()
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📌 9. پیش‌بینی روی داده تست
+# 📌 9. Prediction on test data
 dtest = xgb.DMatrix(X_test)
 pred_probs = final_model.predict(dtest)
 pred_labels = np.argmax(pred_probs, axis=1)
-
-# بازگردانی کلاس‌ها به حالت اصلی
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# 📌 10. Restoring classes to their original state
 reverse_map = {0: -1, 1: 0, 2: 1}
 pred_result = pd.Series(pred_labels).map(reverse_map)
-
-# اضافه کردن به DataFrame و ذخیره خروجی
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# 📤 11. Prediction on test and output
 df_test["Result"] = pred_result
 df_test.to_excel("predicted_test.xlsx", index=False)
 #<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# 📤 دانلود فایل
+# 📦 12.Download the output file
 files.download("predicted_test.xlsx")
