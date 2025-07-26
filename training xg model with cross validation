@@ -1,1 +1,72 @@
+# نصب کتابخانه‌ها
+!pip install openpyxl xgboost scikit-learn matplotlib seaborn
 
+# 1️⃣ وارد کردن کتابخانه‌ها
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import cross_val_score, StratifiedKFold, cross_val_predict
+from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
+from scipy.stats import f_oneway, kruskal
+from xgboost import XGBClassifier
+from google.colab import files
+
+# 2️⃣ آپلود فایل اکسل
+uploaded = files.upload()
+file_name = list(uploaded.keys())[0]
+
+# 3️⃣ لود داده
+df = pd.read_excel(file_name)
+
+# 4️⃣ تمیزسازی اولیه
+target_col = 'Result'
+df = df[df[target_col].isin([-1, 0, 1])]  # فقط کلاس‌های معتبر
+df = df.dropna()  # حذف ردیف‌های ناقص
+
+# 5️⃣ انتخاب ویژگی‌های مفید با ANOVA
+X_all = df.drop(columns=[target_col])
+y_all = df[target_col]
+
+results = []
+for col in X_all.columns:
+    group_data = [X_all[y_all == label][col] for label in sorted(y_all.unique())]
+    try:
+        f_stat, p_value = f_oneway(*group_data)
+        test = "ANOVA"
+    except:
+        f_stat, p_value = kruskal(*group_data)
+        test = "Kruskal"
+    results.append({"Feature": col, "Test": test, "P-value": p_value})
+
+results_df = pd.DataFrame(results).sort_values(by="P-value")
+useful_features = results_df[results_df["P-value"] < 0.05]["Feature"].tolist()
+
+# 6️⃣ داده نهایی برای مدل
+X = df[useful_features]
+y = df[target_col].map({-1: 0, 0: 1, 1: 2})  # نگاشت کلاس‌ها به [0, 1, 2]
+
+# 7️⃣ مدل و تنظیمات Cross-Validation
+model = XGBClassifier(use_label_encoder=False, eval_metric='mlogloss', random_state=42)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# 8️⃣ محاسبه دقت Cross-Validated
+scores = cross_val_score(model, X, y, cv=cv, scoring='accuracy')
+print("🎯 دقت هر Fold:", scores)
+print("✅ میانگین دقت:", np.mean(scores).round(4))
+
+# 9️⃣ پیش‌بینی روی کل داده با Cross-Val برای گزارش نهایی
+y_pred = cross_val_predict(model, X, y, cv=cv)
+
+# 🔟 نمایش گزارش کامل Precision, Recall, F1 برای هر کلاس
+print("\n📋 گزارش عملکرد مدل:")
+print(classification_report(y, y_pred, target_names=['Class -1 (0)', 'Class 0 (1)', 'Class +1 (2)']))
+
+# 🔄 ماتریس سردرگمی و نمودار
+cm = confusion_matrix(y, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['-1', '0', '+1'])
+
+plt.figure(figsize=(6,5))
+disp.plot(cmap='Blues', values_format='d')
+plt.title("🧩 ماتریس سردرگمی مدل")
+plt.show()
